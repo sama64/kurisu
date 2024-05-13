@@ -1,36 +1,38 @@
+import os
 import sys
 from PyQt6 import QtCore, QtGui, QtWidgets
-
 
 class Ui_TaskForm(QtWidgets.QWidget):
     # Signal to indicate when the task's close button is clicked.
     # An integer parameter is used to pass the position of the task in the list.
     closeClicked = QtCore.pyqtSignal(int)
 
+    # Signal to indicate when the task's checkbox state changes.
+    checkboxStateChanged = QtCore.pyqtSignal(int, bool)
+
     # CSS styles for checked and unchecked tasks.
     # These styles are applied based on the task's completion state.
     checked_style = "text-decoration: line-through;"
     unchecked_style = "text-decoration: none;"
 
-    def __init__(self, text, state, position, *args, **kwargs):
+    def __init__(self, text, state, position, uuid, *args, **kwargs):
         super().__init__()
         # Position of the task in the list, used for identifying tasks, especially for deletion.
         self.position = position
-
+        # UUID of the task
+        self.uuid = uuid
         # Initialize the UI components.
         self.init_ui()
-
         # Set the initial state and text of the task based on provided parameters.
         self.task_check_box.setText(text)
         self.task_check_box.setChecked(state)
-
         # Apply the appropriate style based on the initial state.
         if state:
             self.task_check_box.setStyleSheet(self.checked_style)
-
         # Connect signals to their corresponding slots.
-        # When the task's state changes, update its style.
+        # When the task's state changes, update its style and emit the checkboxStateChanged signal.
         self.task_check_box.stateChanged.connect(self.update_style)
+        self.task_check_box.stateChanged.connect(lambda state: self.checkboxStateChanged.emit(self.position, state))
         # When the remove button is clicked, emit a signal to indicate that this task should be closed.
         self.reomve_btn.clicked.connect(self.emitCloseSignal)
 
@@ -39,27 +41,27 @@ class Ui_TaskForm(QtWidgets.QWidget):
         self.setGeometry(0, 0, 1000, 100)  # x, y, width, height
 
         # Load and apply the CSS style from a file.
-        with open("./static/style_task.qss", "r") as style_file:
+        with open(os.path.join(os.getcwd(), "static/style_task.qss"), "r") as style_file:
             style_str = style_file.read()
             self.setStyleSheet(style_str)
 
         # Create a grid layout for the widget.
-        self.gridLayout = QtWidgets.QGridLayout(self)        
-        self.gridLayout.setContentsMargins(0, 0, 0, 0)        
-        self.gridLayout.setSpacing(0)        
-  
+        self.gridLayout = QtWidgets.QGridLayout(self)
+        self.gridLayout.setContentsMargins(0, 0, 0, 0)
+        self.gridLayout.setSpacing(0)
 
         # Create the main task widget and its horizontal layout.
         self.task_widget = QtWidgets.QWidget(parent=self)
         self.horizontalLayout = QtWidgets.QHBoxLayout(self.task_widget)
 
-        # Add a checkbox for marking the task's completion state.  
+        # Add a checkbox for marking the task's completion state.
         self.task_check_box = QtWidgets.QCheckBox(self.task_widget)
         self.horizontalLayout.addWidget(self.task_check_box)
 
         # Add a button for removing the task.
+        close_icon_path = os.path.join(os.getcwd(), "static/icons/close.svg")
         self.reomve_btn = QtWidgets.QPushButton(self.task_widget)
-        self.reomve_btn.setIcon(QtGui.QIcon("./static/icons/close.svg"))
+        self.reomve_btn.setIcon(QtGui.QIcon(close_icon_path))
         self.reomve_btn.setIconSize(QtCore.QSize(20, 20))
         self.horizontalLayout.addWidget(self.reomve_btn)
 

@@ -3,12 +3,10 @@ import os
 import json
 from PyQt6 import QtCore, QtGui, QtWidgets
 
-
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
-
         # Load and apply CSS styles from a file to the main window.
-        with open("./static/style.qss", "r") as style_file:
+        with open(os.path.join(os.getcwd(), "static/style.qss"), "r") as style_file:
             style_str = style_file.read()
             MainWindow.setStyleSheet(style_str)
 
@@ -18,7 +16,8 @@ class Ui_MainWindow(object):
         MainWindow.setWindowTitle("To Do List")
 
         # Set the application's main window icon.
-        window_icon = QtGui.QIcon("./static/icons/list.min.svg")
+        window_icon_path = os.path.join(os.getcwd(), "static/icons/list.min.svg")
+        window_icon = QtGui.QIcon(window_icon_path)
         MainWindow.setWindowIcon(window_icon)
 
         # Create and set the central widget of the main window.
@@ -29,7 +28,7 @@ class Ui_MainWindow(object):
         self.main_verticalLayout = QtWidgets.QVBoxLayout(self.centralWidget)
         self.main_verticalLayout.setContentsMargins(80, 50, 80, 50)
         self.main_verticalLayout.setSpacing(20)
-   
+
         # Create a frame for the title section.
         self.title_frame = QtWidgets.QFrame(parent=self.centralWidget)
         self.title_frame.setMaximumSize(QtCore.QSize(16777215, 60))
@@ -42,10 +41,11 @@ class Ui_MainWindow(object):
         self.title_horizontalLayout.setContentsMargins(10, 10, 10, 10)
 
         # Icon label in the title section.
+        icon_label_path = os.path.join(os.getcwd(), "static/icons/list.min.svg")
         self.icon_label = QtWidgets.QLabel(parent=self.title_frame)
         self.icon_label.setMinimumSize(QtCore.QSize(40, 40))
         self.icon_label.setMaximumSize(QtCore.QSize(40, 40))
-        self.icon_label.setPixmap(QtGui.QPixmap("./static/icons/list.min.svg"))
+        self.icon_label.setPixmap(QtGui.QPixmap(icon_label_path))
         self.icon_label.setScaledContents(True)
         self.icon_label.setObjectName("icon_label")
 
@@ -74,15 +74,9 @@ class Ui_MainWindow(object):
         # ListView for displaying tasks.
         self.task_listView = QtWidgets.QListView(parent=self.task_frame)
         self.task_listView.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
-        self.task_listView.setEditTriggers(
-            QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers
-        )
-        self.task_listView.setDragDropMode(
-            QtWidgets.QAbstractItemView.DragDropMode.DragOnly 
-        )
-        self.task_listView.setSelectionMode(
-            QtWidgets.QAbstractItemView.SelectionMode.NoSelection
-        )
+        self.task_listView.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.task_listView.setDragDropMode(QtWidgets.QAbstractItemView.DragDropMode.DragOnly)
+        self.task_listView.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.NoSelection)
         self.task_listView.setMovement(QtWidgets.QListView.Movement.Free)
         self.task_listView.setObjectName("task_listView")
 
@@ -108,12 +102,13 @@ class Ui_MainWindow(object):
         self.add_horizontalLayout.addWidget(self.new_task)
 
         # Button for adding a new task.
+        add_btn_icon_path = os.path.join(os.getcwd(), "static/icons/add-black.min.svg")
         self.add_btn = QtWidgets.QPushButton(parent=self.add_task_frame)
         self.add_btn.setText("Add")
         font = QtGui.QFont()
         font.setBold(True)
         self.add_btn.setFont(font)
-        self.add_btn.setIcon(QtGui.QIcon("./static/icons/add-black.min.svg"))
+        self.add_btn.setIcon(QtGui.QIcon(add_btn_icon_path))
         self.add_btn.setIconSize(QtCore.QSize(30, 30))
         self.add_btn.setObjectName("add_btn")
 
@@ -124,3 +119,18 @@ class Ui_MainWindow(object):
         self.main_verticalLayout.addWidget(self.title_frame)
         self.main_verticalLayout.addWidget(self.task_frame)
         self.main_verticalLayout.addWidget(self.add_task_frame)
+
+        # Add a method to reload the task list
+        self.reload_task_list = None
+
+        # Create a timer to check for changes in the task file
+        self.timer = QtCore.QTimer()
+        self.timer.timeout.connect(self.check_for_changes)
+        self.timer.start(500)  # Check for changes every 0.5 seconds
+
+    def set_reload_task_list_callback(self, callback):
+        self.reload_task_list = callback
+
+    def check_for_changes(self):
+        if self.reload_task_list:
+            self.reload_task_list()
