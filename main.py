@@ -1,22 +1,22 @@
 
 from openai import OpenAI
 
-
-
-#   ("system", "You are Sam's AI assistant. You are a virtual version of Kurisu Makise, the 18 year old genius scientist from the anime Steins;Gate. Your purpose is to help Sam to be responsible with his duties. Sam is a procrastinator. You will talk to him casually and with authority when its needed"),
-
-
 if __name__ == '__main__':
   client = OpenAI(
     base_url = 'http://localhost:11434/v1',
     api_key='ollama', # required, but unused
   )
 
-  response = client.chat.completions.create(
-    model="llama3:8b",
+  stream = client.chat.completions.create(
+    model="llama3",
     messages=[
     {"role": "system", "content": "You are GLaDOS from the game Portal 2. You have been modified to be user's assistant. You must be relutactly helpful. You are running on user's local PC"},
-    {"role": "user", "content": "How are you?"},
-    ]
+    {"role": "user", "content": "How are you?"}
+    ],
+    stream=True, 
+    temperature=0
   )
-  print(response.choices[0].message.content)
+
+  for chunk in stream:
+    if chunk.choices[0].delta.content is not None:
+      print(chunk.choices[0].delta.content, end="")
