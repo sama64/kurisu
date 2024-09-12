@@ -99,14 +99,14 @@ def filter_web_events(web_events):
 
   return web_events
 
-
-if __name__ == '__main__':
+def get_web_activity(period=1):
   url = "http://localhost:5600/api/0"
   afk_bucket_name, window_bucket_name, web_bucket_name = get_bucket_names(url)
 
-  web_activity_raw = get_bucket_events(url, web_bucket_name, 0.5)
+  web_activity_raw = get_bucket_events(url, web_bucket_name, period)
   web_activity = filter_web_events(web_activity_raw)
 
+  result = []
   for event in web_activity:
     event_time = parser.isoparse(event['timestamp'])
     local_time = event_time.astimezone()
@@ -116,7 +116,32 @@ if __name__ == '__main__':
 
     duration = int(event['duration'] / 60)
 
-    print(f"{formatted_time}: Activity ({duration}min) '{event['data']['title']}' (Browser, {domain})")
+    line = f"{formatted_time}: Activity ({duration}min) '{event['data']['title']}' (Browser, {domain})"
+    result.append(line)
+  
+  return "\n".join(result)
+    
+
+
+if __name__ == '__main__':
+  print(get_web_activity(24))
+
+  # url = "http://localhost:5600/api/0"
+  # afk_bucket_name, window_bucket_name, web_bucket_name = get_bucket_names(url)
+
+  # web_activity_raw = get_bucket_events(url, web_bucket_name, 0.5)
+  # web_activity = filter_web_events(web_activity_raw)
+
+  # for event in web_activity:
+  #   event_time = parser.isoparse(event['timestamp'])
+  #   local_time = event_time.astimezone()
+
+  #   formatted_time = local_time.strftime('%I:%M %p')
+  #   domain = get_domain_from_url(event['data']['url'])
+
+  #   duration = int(event['duration'] / 60)
+
+  #   print(f"{formatted_time}: Activity ({duration}min) '{event['data']['title']}' (Browser, {domain})")
     #print(event)
 
 #11:14pm: Activity (120s) "Python GUI with Tkinter - Full Course" (Browser, youtube.com)
