@@ -8,6 +8,7 @@ from aiogram import Bot, Dispatcher, types
 from dotenv import load_dotenv
 from openai import OpenAI
 from calendar_utils import get_calendar_events
+from utils import clean_completion, format_message_with_time
 
 # Load env variables
 load_dotenv()
@@ -31,26 +32,20 @@ message_history = deque(maxlen=10)
 # Flag to indicate if a conversation is in progress
 conversation_in_progress = asyncio.Event()
 
-def format_message_with_time(content, timestamp=None):
-    """Formats the message with hour:minute or returns the content as is if no timestamp is provided."""
-    if timestamp:
-        message_time = datetime.fromtimestamp(timestamp).strftime("%H:%M")
-        return f"{message_time} - {content}"
-    return content
-
 def get_openai_response(user_message: str):
     """Get a response from OpenAI using the last 10 messages for context."""
     messages = [
         {"role": "system", "content": "You're Kurisu Makise, a helpful assistant with a sharp wit. You respond succinctly but with a natural flow, avoiding repetition. Your purpose is to: 1: keep the user on its regular sleep schedule. 2: keep the user away from procrastinating too much"},
         {"role": "system", "content": get_calendar_events()}  # Add today's events to context
     ]
-    print(get_calendar_events())
     
     # Add the last 10 messages as context
     for msg in message_history:
         messages.append(msg)
 
-    messages.append({"role": "user", "content": user_message})
+    time_now = datetime.now().strftime("%H:%M")
+
+    messages.append({"role": "user", "content": f"timestamp: {time_now} - {user_message}"})
 
     # Create the OpenAI request
     response = client.chat.completions.create(
@@ -62,7 +57,7 @@ def get_openai_response(user_message: str):
         frequency_penalty=0.4,      # discourages repetitive word usage
         presence_penalty=0.3        # discourages topic repetition
     )
-    return response.choices[0].message.content
+    return clean_completion(response.choices[0].message.content)
 
 @dp.message()
 async def handle_user_message(message: types.Message):
@@ -72,9 +67,11 @@ async def handle_user_message(message: types.Message):
     # Get the OpenAI response
     openai_response = await asyncio.to_thread(get_openai_response, user_message)
     
+    time_now = datetime.now().strftime("%H:%M")
+
     # Store the current conversation in the message history
-    message_history.appendleft({"role": "user", "content": user_message})
-    message_history.appendleft({"role": "assistant", "content": openai_response})
+    message_history.appendleft({"role": "user", "content": f"timestamp: {time_now} - {user_message}"})
+    message_history.appendleft({"role": "assistant", "content": f"{time_now} - {openai_response}"})
 
     # Send OpenAI response back to user
     await message.answer(openai_response)
