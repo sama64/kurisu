@@ -35,6 +35,9 @@ trans-test/*
 models/*
 *.env
 /venv/*
+
 notes.txt
 ideas.txt
 deprecated/*
+credentials.json
+token.json
