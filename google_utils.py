@@ -5,11 +5,12 @@ from googleapiclient.discovery import build
 from datetime import datetime, timedelta
 import os
 import pytz
+from tzlocal import get_localzone
 
-SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
+SCOPES = ['https://www.googleapis.com/auth/calendar.readonly', 'https://www.googleapis.com/auth/fitness.sleep.read']
 
-def authenticate_google_calendar():
-  """Authenticate and return Google Calendar API service."""
+def get_creds():
+  """Return OAuth credentials."""
   creds = None
   
   # Check if token.json exists, if not, run the OAuth flow
@@ -26,17 +27,27 @@ def authenticate_google_calendar():
   if creds and creds.expired and creds.refresh_token:
     creds.refresh(Request())
   
+  return creds
+
+def authenticate_google_calendar():
+  """Authenticate and return Google Calendar API service."""
+  creds = get_creds()
+  
   service = build('calendar', 'v3', credentials=creds)
   return service
 
-from datetime import datetime, timedelta
-import pytz
+def authenticate_google_fitness():
+  """Authenticate and return Google Fitness API service."""
+  creds = get_creds()
+  
+  service = build('fitness', 'v1', credentials=creds)
+  return service
 
 def get_calendar_events():
   """Fetch today's calendar events."""
   service = authenticate_google_calendar()
   
-  local_tz = pytz.timezone('America/Sao_Paulo')  # use your timezone here
+  local_tz = get_localzone()
   now = datetime.now(local_tz).isoformat()
   end_of_day = (datetime.now(local_tz) + timedelta(days=1)).replace(hour=0, minute=0, second=0).isoformat()
 
@@ -64,3 +75,38 @@ def get_calendar_events():
     event_descriptions.append(f"{event['summary']} on {date} from {start_dt} to {end_dt} (Duration: {duration})")
   
   return "Today's events: " + ", ".join(event_descriptions)
+
+def get_sleep_data():
+    """Fetch sleep data for the last 24 hours."""
+    fitness_service = authenticate_google_fitness()
+    
+    end_time = datetime.now(pytz.UTC)
+    start_time = end_time - timedelta(days=1)
+    
+    body = {
+        "aggregateBy": [{
+            "dataTypeName": "com.google.sleep.segment"
+        }],
+        "startTimeMillis": int(start_time.timestamp() * 1000),
+        "endTimeMillis": int(end_time.timestamp() * 1000),
+    }
+
+    response = fitness_service.users().dataset().aggregate(userId="me", body=body).execute()
+    
+    sleep_periods = []
+    for bucket in response.get('bucket', []):
+        for dataset in bucket.get('dataset', []):
+            for point in dataset.get('point', []):
+                start_time_nanos = int(point['startTimeNanos'])
+                end_time_nanos = int(point['endTimeNanos'])
+                start_time = datetime.fromtimestamp(start_time_nanos // 1000000000, pytz.UTC)
+                end_time = datetime.fromtimestamp(end_time_nanos // 1000000000, pytz.UTC)
+                duration = (end_time - start_time).total_seconds() / 3600  # duration in hours
+                
+                sleep_periods.append({
+                    'start_time': start_time,
+                    'end_time': end_time,
+                    'duration': duration
+                })
+    
+    return sleep_periods
