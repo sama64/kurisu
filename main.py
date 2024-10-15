@@ -7,8 +7,9 @@ from datetime import datetime
 from aiogram import Bot, Dispatcher, types
 from dotenv import load_dotenv
 from openai import OpenAI
-from google_utils import get_calendar_events, get_sleep_data
-from utils import clean_completion, format_message_with_time, get_timestamp, get_time_now
+from google_utils import get_calendar_events, get_sleep_data, get_tasks
+from utils import clean_completion, format_message_with_time, get_timestamp, get_time_now, fetch_usage
+from user_context import get_user_info, get_character_info, get_directives
 
 # Load env variables
 load_dotenv()
@@ -27,28 +28,35 @@ bot = Bot(token=TEL_API_TOKEN)
 dp = Dispatcher()
 
 # Store the last 10 messages in a deque
-message_history = deque(maxlen=10)
+message_history = deque(maxlen=25)
 
 # Flag to indicate if a conversation is in progress
 conversation_in_progress = asyncio.Event()
 
 def get_openai_response(user_message: str):
-    """Get a response from OpenAI using the last 10 messages for context."""
+    """Get a response from OpenAI using the last 25 messages for context."""
     messages = [
         {"role": "system", "content": """You're Kurisu Makise, a helpful assistant with a sharp wit. You respond succinctly but with a natural flow, avoiding repetition. 
         Your purpose is to: 1: keep the user on its regular sleep schedule. 2: keep the user away from procrastinating too much. 
-        DO NOT BE REPETITIVE"""},
-        {"role": "system", "content": f"Current Time: {get_timestamp()}"},
-        {"role": "system", "content": get_calendar_events()} 
+        DO NOT REPEAT YOURSELF
+        DO NOT LET THE USER PROCRASTINATE"""},
+        {"role": "system", "content": f"Character: {get_character_info()}"},
+        {"role:": "system", "content": f"User info: {get_user_info()}"},
+        {"role": "system", "content": f"Current Time: {get_timestamp()} "},
+        {"role": "system", "content": f"Calendar events: {get_calendar_events()}"},
+        {"role": "system", "content": f"{get_tasks()}"},
+        {"role": "system", "content": f"Directives: {get_directives()}"}
     ]
     
+
     # Add the last 10 messages as context
     for msg in message_history:
         messages.append(msg)
 
     time_now = datetime.now().strftime("%H:%M")
 
-    messages.append({"role": "user", "content": f"{time_now} - {user_message}"})
+    if (user_message):
+        messages.append({"role": "user", "content": f"{time_now} - {user_message}"})
 
     # Create the OpenAI request
     response = client.chat.completions.create(
@@ -60,6 +68,13 @@ def get_openai_response(user_message: str):
         frequency_penalty=0.4,      # discourages repetitive word usage
         presence_penalty=0.3        # discourages topic repetition
     )
+
+    # Fetch and print token usage
+    try:
+        fetch_usage(response.id, OPENROUTER_API_KEY)
+    except Exception as e:
+        print(e)
+
     return clean_completion(response.choices[0].message.content)
 
 @dp.message()
@@ -68,11 +83,11 @@ async def handle_user_message(message: types.Message):
     user_message = message.text
 
     # test
-    sleep_data = get_sleep_data()
-    for period in sleep_data:
-        print(f"Sleep period: {period['start_time'].strftime('%Y-%m-%d %H:%M')} to {period['end_time'].strftime('%Y-%m-%d %H:%M')}")
-        print(f"Duration: {period['duration']:.2f} hours")
-        print("---")
+    # sleep_data = get_sleep_data()
+    # for period in sleep_data:
+    #     print(f"Sleep period: {period['start_time'].strftime('%Y-%m-%d %H:%M')} to {period['end_time'].strftime('%Y-%m-%d %H:%M')}")
+    #     print(f"Duration: {period['duration']:.2f} hours")
+    #     print("---")
 
     # Get the OpenAI response
     openai_response = await asyncio.to_thread(get_openai_response, user_message)
@@ -87,14 +102,15 @@ async def handle_user_message(message: types.Message):
 
 async def send_random_message():
     while True:
-        # Wait for a random interval between 40 minutes and 2 hours
+        # Wait for a random interval between 40 minutes and 3 hours
         wait_time = random.randint(40 * 60, 2 * 60 * 60)
         await asyncio.sleep(wait_time)
 
         # Check if a conversation is in progress
         if not conversation_in_progress.is_set():
-            random_message = await asyncio.to_thread(get_openai_response, "Generate a random thought or observation as Kurisu Makise.")
-            message_history.appendleft({"role": "assistant", "content": f"{get_time_now()} - {random_message}"})
+            openai_response = await asyncio.to_thread(get_openai_response)
+            message_history.appendleft({"role": "assistant", "content": f"{get_time_now()} - {openai_response}"})
+            
             await bot.send_message(chat_id=YOUR_CHAT_ID, text=random_message)
 
 async def main():

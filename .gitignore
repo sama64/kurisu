@@ -41,3 +41,4 @@ ideas.txt
 deprecated/*
 credentials.json
 token.json
+user_context.py
